@@ -9,11 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@prisma/client": "^5.10.0",
+    "@auth/prisma-adapter": "^2.8.0",
+    "@prisma/client": "^5.22.0",
     "@tensorflow-models/coco-ssd": "^2.2.3",
-    "@tensorflow/tfjs": "^4.17.0",
+    "@tensorflow/tfjs": "^4.22.0",
     "next": "14.1.0",
-    "next-auth": "^4.24.6",
+    "next-auth": "^4.24.11",
     "pdfkit": "^0.14.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -26,7 +27,7 @@
     "@types/react-dom": "^18.2.19",
     "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35",
-    "prisma": "^5.10.0",
+    "prisma": "^5.22.0",
     "tailwindcss": "^3.4.1"
   }
-} 
+}
