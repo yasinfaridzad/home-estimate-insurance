@@ -75,6 +75,7 @@ export default function ItemScanner() {
   const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([])
   const [model, setModel] = useState<cocoSsd.ObjectDetection | null>(null)
   const [feedbackItem, setFeedbackItem] = useState<DetectedItem | null>(null)
+  const [confirmedItems, setConfirmedItems] = useState<DetectedItem[]>([])
   const { data: session } = useSession()
 
   useEffect(() => {
@@ -166,12 +167,10 @@ export default function ItemScanner() {
       context.fillText(`${item.name} (${Math.round(item.confidence * 100)}%)`, x, y - 5)
     })
 
-    // Show feedback modal for each detected item
-    items.forEach(item => {
-      if (item.confidence < 0.8) { // Only ask for feedback on low confidence detections
-        setFeedbackItem(item)
-      }
-    })
+    // Show feedback modal for the first detected item
+    if (items.length > 0) {
+      setFeedbackItem(items[0])
+    }
   }
 
   const saveItem = async (item: DetectedItem) => {
@@ -223,49 +222,30 @@ export default function ItemScanner() {
         throw new Error('Failed to save feedback')
       }
 
-      // If the detection was incorrect and we have a correct name, save the corrected item
-      if (!isCorrect && correctName) {
-        const saveResponse = await fetch('/api/items', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: correctName,
-            confidence: 1.0, // Set high confidence for user-corrected items
-            imageData: feedbackItem.imageData,
-          }),
-        })
+      // Create the confirmed item
+      const confirmedItem = isCorrect 
+        ? { ...feedbackItem, confidence: 1.0 }
+        : correctName 
+          ? { ...feedbackItem, name: correctName, confidence: 1.0 }
+          : null
 
-        if (!saveResponse.ok) {
-          throw new Error('Failed to save corrected item')
-        }
+      // Add to confirmed items if valid
+      if (confirmedItem) {
+        setConfirmedItems(prev => [...prev, confirmedItem])
       }
 
       // Update the detected items list
       setDetectedItems(prev => {
-        if (isCorrect) {
-          // If correct, keep the item but update its confidence
-          return prev.map(i => 
-            i.id === feedbackItem.id 
-              ? { ...i, confidence: 1.0 }
-              : i
-          )
-        } else if (correctName) {
-          // If incorrect with correction, replace the item with the corrected one
-          return prev.map(i => 
-            i.id === feedbackItem.id 
-              ? { ...i, name: correctName, confidence: 1.0 }
-              : i
-          )
+        const remainingItems = prev.filter(i => i.id !== feedbackItem.id)
+        if (remainingItems.length > 0) {
+          setFeedbackItem(remainingItems[0])
         } else {
-          // If incorrect without correction, remove the item
-          return prev.filter(i => i.id !== feedbackItem.id)
+          setFeedbackItem(null)
         }
+        return remainingItems
       })
     } catch (error) {
       console.error('Error saving feedback:', error)
-    } finally {
       setFeedbackItem(null)
     }
   }
@@ -306,11 +286,11 @@ export default function ItemScanner() {
         />
       </div>
 
-      {detectedItems.length > 0 && (
+      {confirmedItems.length > 0 && (
         <div className="mt-4">
-          <h3 className="text-xl font-semibold mb-2">Detected Items:</h3>
+          <h3 className="text-xl font-semibold mb-2">Confirmed Items:</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {detectedItems.map(item => (
+            {confirmedItems.map(item => (
               <div
                 key={item.id}
                 className="bg-white p-4 rounded-lg shadow-md flex justify-between items-center"
