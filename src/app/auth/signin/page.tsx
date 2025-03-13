@@ -18,14 +18,24 @@ export default function SignIn() {
   if (status === 'loading') {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">Loading...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="text-gray-600">Loading...</div>
+        </div>
       </div>
     )
   }
 
   const handleSignIn = async () => {
     try {
-      await signIn('google', { callbackUrl: '/' })
+      const result = await signIn('google', { 
+        callbackUrl: '/',
+        redirect: false
+      })
+      
+      if (result?.error) {
+        console.error('Sign in error:', result.error)
+      }
     } catch (error) {
       console.error('Sign in error:', error)
     }

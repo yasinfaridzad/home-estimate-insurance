@@ -7,16 +7,24 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token
+      authorized: ({ token, req }) => {
+        const isAuthPage = req.nextUrl.pathname.startsWith('/auth')
+        if (isAuthPage) {
+          return true
+        }
+        return !!token
+      }
     },
   }
 )
 
 export const config = {
   matcher: [
+    "/",
     "/scan",
     "/reports",
     "/settings",
+    "/auth/:path*",
     "/api/scan/:path*",
     "/api/reports/:path*",
     "/api/settings/:path*"

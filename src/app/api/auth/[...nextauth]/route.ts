@@ -18,7 +18,7 @@ declare module "next-auth" {
 
 const prisma = new PrismaClient()
 
-const handler = NextAuth({
+export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
@@ -48,6 +48,9 @@ const handler = NextAuth({
       return token
     },
   },
-})
+  debug: process.env.NODE_ENV === 'development',
+}
+
+const handler = NextAuth(authOptions)
 
 export { handler as GET, handler as POST } 

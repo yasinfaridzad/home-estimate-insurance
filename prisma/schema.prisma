@@ -61,6 +61,31 @@ model Item {
   name        String
   confidence  Float
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feedback    Feedback?
+  trainingData TrainingData[]
+}
+
+model Feedback {
+  id          String   @id @default(cuid())
+  itemId      String   @unique
+  item        Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  isCorrect   Boolean
+  correctName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TrainingData {
+  id          String   @id @default(cuid())
+  itemId      String
+  item        Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  imageData   String   // Base64 encoded image
+  detectedName String
+  correctName String?
+  confidence  Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

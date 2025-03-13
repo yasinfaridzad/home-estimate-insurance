@@ -1,12 +1,10 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useSession, signIn } from 'next-auth/react'
 import Link from 'next/link'
 
 export default function Navbar() {
   const { data: session } = useSession()
-
-  if (!session) return null
 
   return (
     <nav className="bg-white shadow-md">
@@ -17,18 +15,29 @@ export default function Navbar() {
           </Link>
           
           <div className="flex items-center space-x-4">
-            <Link
-              href="/scan"
-              className="text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              Scan Items
-            </Link>
-            <Link
-              href="/reports"
-              className="text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              Reports
-            </Link>
+            {session ? (
+              <>
+                <Link
+                  href="/scan"
+                  className="text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Scan Items
+                </Link>
+                <Link
+                  href="/reports"
+                  className="text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Reports
+                </Link>
+              </>
+            ) : (
+              <button
+                onClick={() => signIn('google')}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+              >
+                Sign In
+              </button>
+            )}
           </div>
         </div>
       </div>
