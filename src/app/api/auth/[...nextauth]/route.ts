@@ -37,16 +37,72 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.sub as string
+        const user = await prisma.user.findUnique({
+          where: { email: session.user.email || undefined }
+        })
+        if (user) {
+          session.user.id = user.id
+        }
       }
       return session
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
-        token.id = user.id
+        const dbUser = await prisma.user.findUnique({
+          where: { email: user.email || undefined }
+        })
+        if (dbUser) {
+          token.id = dbUser.id
+        }
       }
       return token
     },
+    async signIn({ user, account, profile }) {
+      if (account?.provider === 'google') {
+        try {
+          // Check if user exists
+          const existingUser = await prisma.user.findUnique({
+            where: { email: user.email || undefined }
+          })
+          
+          if (!existingUser) {
+            // Create new user with the Google profile data
+            const newUser = await prisma.user.create({
+              data: {
+                email: user.email,
+                name: user.name,
+                image: user.image,
+                accounts: {
+                  create: {
+                    type: account.type,
+                    provider: account.provider,
+                    providerAccountId: account.providerAccountId,
+                    access_token: account.access_token,
+                    expires_at: account.expires_at,
+                    token_type: account.token_type,
+                    scope: account.scope,
+                    id_token: account.id_token,
+                  }
+                }
+              }
+            })
+            console.log('Created new user:', newUser)
+          }
+        } catch (error) {
+          console.error('Error creating user:', error)
+          return false
+        }
+      }
+      return true
+    }
+  },
+  events: {
+    async createUser({ user }) {
+      console.log('User created:', user)
+    },
+    async signIn({ user, account, profile }) {
+      console.log('User signed in:', user)
+    }
   },
   debug: process.env.NODE_ENV === 'development',
 }

@@ -154,7 +154,15 @@ export default function ItemScanner() {
       imageData
     }))
 
-    setDetectedItems(items)
+    // Clear previous detections
+    setDetectedItems([])
+    setConfirmedItems([])
+
+    // Show feedback modal for each detected item
+    if (items.length > 0) {
+      setDetectedItems(items)
+      setFeedbackItem(items[0])
+    }
 
     // Draw bounding boxes
     context.strokeStyle = '#00ff00'
@@ -166,11 +174,6 @@ export default function ItemScanner() {
       context.font = '16px Arial'
       context.fillText(`${item.name} (${Math.round(item.confidence * 100)}%)`, x, y - 5)
     })
-
-    // Show feedback modal for the first detected item
-    if (items.length > 0) {
-      setFeedbackItem(items[0])
-    }
   }
 
   const saveItem = async (item: DetectedItem) => {
@@ -234,7 +237,7 @@ export default function ItemScanner() {
         setConfirmedItems(prev => [...prev, confirmedItem])
       }
 
-      // Update the detected items list
+      // Update the detected items list and show next item for feedback
       setDetectedItems(prev => {
         const remainingItems = prev.filter(i => i.id !== feedbackItem.id)
         if (remainingItems.length > 0) {
