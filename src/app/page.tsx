@@ -1,72 +1,75 @@
 'use client'
 
-import { useSession, signIn, signOut } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
-import ItemScanner from '@/components/itemRecognition/ItemScanner'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 
 export default function Home() {
   const { data: session, status } = useSession()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin')
+    }
+  }, [status, router])
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">Loading...</div>
       </div>
     )
   }
 
   if (!session) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <h1 className="text-4xl font-bold mb-8">HomeScan Insurance Estimator</h1>
-        <p className="text-xl text-gray-600 mb-8 text-center max-w-2xl">
-          Scan your household items and get instant insurance value estimates using AI technology.
-        </p>
-        <button
-          onClick={() => signIn('google')}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Sign in with Google
-        </button>
-      </div>
-    )
+    return null
   }
 
   return (
-    <div className="min-h-screen p-4">
-      <header className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">Welcome, {session.user?.name}</h1>
-        <button
-          onClick={() => signOut()}
-          className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-        >
-          Sign out
-        </button>
-      </header>
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold">Home Insurance Estimator</h1>
+            <button
+              onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
 
-      <nav className="mb-8">
-        <ul className="flex space-x-4">
-          <li>
-            <Link href="/scan" className="text-blue-600 hover:underline">
-              Scan Items
-            </Link>
-          </li>
-          <li>
-            <Link href="/reports" className="text-blue-600 hover:underline">
-              View Reports
-            </Link>
-          </li>
-          <li>
-            <Link href="/settings" className="text-blue-600 hover:underline">
-              Settings
-            </Link>
-          </li>
-        </ul>
-      </nav>
+          <div className="space-y-6">
+            <div className="bg-blue-50 p-6 rounded-lg">
+              <h2 className="text-xl font-semibold mb-4">Start Scanning Your Items</h2>
+              <p className="text-gray-600 mb-4">
+                Use our advanced AI-powered scanner to identify and catalog your household items.
+              </p>
+              <Link
+                href="/scan"
+                className="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Go to Scanner
+              </Link>
+            </div>
 
-      <main>
-        <ItemScanner />
-      </main>
+            <div className="bg-green-50 p-6 rounded-lg">
+              <h2 className="text-xl font-semibold mb-4">View Reports</h2>
+              <p className="text-gray-600 mb-4">
+                Access detailed reports of your scanned items and insurance estimates.
+              </p>
+              <Link
+                href="/reports"
+                className="inline-block bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+              >
+                View Reports
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 } 

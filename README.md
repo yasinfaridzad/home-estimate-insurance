@@ -38,7 +38,7 @@ GOOGLE_CLIENT_SECRET="your-google-client-secret"
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+5. Open [http://localhost:3010](http://localhost:3010) in your browser.
 
 ## Technologies Used
 

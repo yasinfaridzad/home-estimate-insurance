@@ -1,32 +1,61 @@
 'use client'
 
-import { signIn } from 'next-auth/react'
+import { signIn, useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 import Image from 'next/image'
 
 export default function SignIn() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900">Welcome to HomeScan</h2>
-          <p className="mt-2 text-gray-600">
-            Sign in to manage your household inventory
-          </p>
-        </div>
+  const { data: session, status } = useSession()
+  const router = useRouter()
 
-        <div className="mt-8 space-y-4">
+  useEffect(() => {
+    if (session) {
+      router.replace('/')
+    }
+  }, [session, router])
+
+  if (status === 'loading') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">Loading...</div>
+      </div>
+    )
+  }
+
+  const handleSignIn = async () => {
+    try {
+      await signIn('google', { callbackUrl: '/' })
+    } catch (error) {
+      console.error('Sign in error:', error)
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="w-full max-w-md">
+        <div className="bg-white py-8 px-6 shadow-lg rounded-lg">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              Welcome Back
+            </h2>
+            <p className="text-gray-600">
+              Sign in to manage your home insurance inventory
+            </p>
+          </div>
+
           <button
-            onClick={() => signIn('google', { callbackUrl: '/' })}
-            className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            onClick={handleSignIn}
+            className="w-full flex items-center justify-center gap-3 bg-white px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <Image
-              src="/google-logo.png"
-              alt="Google logo"
+              src="/google.svg"
+              alt="Google"
               width={20}
               height={20}
-              className="mr-2"
+              className="w-5 h-5"
             />
-            Sign in with Google
+            <span>Continue with Google</span>
           </button>
         </div>
       </div>

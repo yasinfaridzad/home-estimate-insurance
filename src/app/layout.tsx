@@ -1,28 +1,25 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import AuthProvider from '@/components/auth/AuthProvider'
+import { AuthProvider } from '@/components/providers/AuthProvider'
 import Navbar from '@/components/navigation/Navbar'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'HomeScan Insurance Estimator',
-  description: 'Scan and estimate insurance values for your household items',
-  manifest: '/manifest.json',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'HomeScan'
-  }
+  title: 'Home Insurance Estimator',
+  description: 'AI-powered home insurance estimation tool',
+  icons: {
+    apple: '/icon-192x192.png',
+  },
 }
 
 export const viewport: Viewport = {
-  themeColor: '#3B82F6',
+  themeColor: '#ffffff',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({
