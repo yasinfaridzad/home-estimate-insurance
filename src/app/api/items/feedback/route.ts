@@ -26,6 +26,7 @@ export async function POST(request: Request) {
           name: isCorrect ? detectedName : correctName,
           confidence: isCorrect ? 1.0 : confidence,
           userId: session.user.id,
+          imageData: imageData || null
         },
       })
     } else {
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
         data: {
           name: isCorrect ? detectedName : correctName,
           confidence: isCorrect ? 1.0 : confidence,
+          imageData: imageData || item.imageData
         },
       })
     }

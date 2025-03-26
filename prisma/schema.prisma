@@ -46,6 +46,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   items         Item[]
+  trainingData  TrainingData[]
 }
 
 model VerificationToken {
@@ -60,12 +61,11 @@ model Item {
   id          String   @id @default(cuid())
   name        String
   confidence  Float
+  imageData   String?
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
   feedback    Feedback?
-  trainingData TrainingData[]
 }
 
 model Feedback {
@@ -80,12 +80,16 @@ model Feedback {
 
 model TrainingData {
   id          String   @id @default(cuid())
-  itemId      String
-  item        Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  imageData   String   // Base64 encoded image
-  detectedName String
-  correctName String?
-  confidence  Float
+  itemName    String   // Correct item name
+  imageData   String   // Base64 encoded image data
+  bboxX       Float    // Bounding box X coordinate
+  bboxY       Float    // Bounding box Y coordinate
+  bboxWidth   Float    // Bounding box width
+  bboxHeight  Float    // Bounding box height
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  isVerified  Boolean  @default(false)
+  confidence  Float    // Original detection confidence
+  detectedAs  String   // What the model originally detected it as
 }

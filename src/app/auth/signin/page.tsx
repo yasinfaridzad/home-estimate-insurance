@@ -47,7 +47,7 @@ export default function SignIn() {
         <div className="bg-white py-8 px-6 shadow-lg rounded-lg">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Welcome Back
+              Welcome to Home Insurance Inventory
             </h2>
             <p className="text-gray-600">
               Sign in to manage your home insurance inventory

@@ -26,6 +26,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     }),
   ],
+  debug: process.env.NODE_ENV === 'development', // Enable debug only in development
   pages: {
     signIn: '/auth/signin',
     error: '/auth/error',

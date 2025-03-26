@@ -1,0 +1,65 @@
+How to Manually Restart the Localhost Server
+=========================================
+
+IMPORTANT - Before Starting:
+--------------------------
+1. Open Command Prompt (CMD) or PowerShell
+2. Navigate to your project directory using:
+   Command: cd C:\Users\Administrator\Documents\Home-Estimate-insurance
+   (This is your project's root directory where package.json is located)
+
+1. Stop all Node.js processes
+---------------------------
+Command: taskkill /F /IM node.exe
+
+Expected outputs:
+- Success message: if Node.js was running and got terminated
+- "FEHLER: Der Prozess 'node.exe' wurde nicht gefunden" (German) or
+  "ERROR: The process 'node.exe' was not found" (English)
+  → This is OK! It just means no Node.js process was running
+
+2. Clean Next.js cache
+---------------------
+Command: Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
+This removes the Next.js cache directory to ensure a clean restart.
+The -ErrorAction SilentlyContinue flag prevents errors if the directory doesn't exist.
+
+3. Start the development server
+----------------------------
+Command: npm run dev
+This starts the Next.js development server on port 3010.
+You should see output indicating the server is running:
+- Local: http://localhost:3010
+- Network: http://0.0.0.0:3010
+
+Additional Tips:
+--------------
+- ALWAYS make sure you see your project files when you run 'dir' or 'ls'
+- You should see files like package.json, next.config.js in your directory
+- If you're not in the right directory, the commands won't work
+- To check if you're in the right place, look for these key files:
+  * package.json
+  * next.config.js
+  * src/ folder
+  * .env file
+
+How to Check Your Location:
+-------------------------
+1. In CMD/PowerShell, type 'pwd' to see current directory
+2. Type 'dir' (CMD) or 'ls' (PowerShell) to list files
+3. Make sure you see the files listed above
+
+Common Issues:
+------------
+1. "Port already in use": Run the taskkill command to free up the port
+2. "Module not found": Run npm install to reinstall dependencies
+3. "Cannot find module 'next'": Run npm install next to install Next.js
+4. "Command not found": You're probably in the wrong directory
+5. "Process not found" when running taskkill: This is normal if server wasn't running
+
+Remember: These steps should be performed in order, and make sure to wait for each command to complete before moving to the next one.
+
+Quick Directory Check:
+-------------------
+If lost, copy and paste this command:
+cd C:\Users\Administrator\Documents\Home-Estimate-insurance 

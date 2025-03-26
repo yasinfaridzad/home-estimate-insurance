@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import * as tf from '@tensorflow/tfjs'
 import * as cocoSsd from '@tensorflow-models/coco-ssd'
+import Toast from '@/components/ui/Toast'
 
 interface DetectedItem {
   id: string
@@ -68,6 +69,11 @@ function FeedbackModal({ item, onFeedback, onClose }: FeedbackModalProps) {
   )
 }
 
+interface ToastMessage {
+  message: string
+  type: 'success' | 'error' | 'info'
+}
+
 export default function ItemScanner() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -76,7 +82,12 @@ export default function ItemScanner() {
   const [model, setModel] = useState<cocoSsd.ObjectDetection | null>(null)
   const [feedbackItem, setFeedbackItem] = useState<DetectedItem | null>(null)
   const [confirmedItems, setConfirmedItems] = useState<DetectedItem[]>([])
+  const [toast, setToast] = useState<ToastMessage | null>(null)
   const { data: session } = useSession()
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info') => {
+    setToast({ message, type })
+  }
 
   useEffect(() => {
     // Load the COCO-SSD model
@@ -177,7 +188,27 @@ export default function ItemScanner() {
   }
 
   const saveItem = async (item: DetectedItem) => {
+    if (!session?.user) {
+      console.error('No user session found')
+      showToast('You must be logged in to save items.', 'error')
+      return
+    }
+
     try {
+      console.log('Starting to save item:', {
+        name: item.name,
+        confidence: item.confidence,
+        imageDataLength: item.imageData ? item.imageData.length : 0,
+        sessionUser: session.user
+      })
+
+      // Check if imageData is valid
+      if (!item.imageData || item.imageData.length < 100) {
+        console.error('Invalid or missing image data')
+        showToast('Missing image data. Please try capturing the item again.', 'error')
+        return
+      }
+
       const response = await fetch('/api/items', {
         method: 'POST',
         headers: {
@@ -187,26 +218,56 @@ export default function ItemScanner() {
           name: item.name,
           confidence: item.confidence,
           imageData: item.imageData,
+          userId: session.user.id
         }),
       })
 
+      const responseText = await response.text()
+      console.log('Raw response:', responseText)
+
       if (!response.ok) {
-        throw new Error('Failed to save item')
+        let error
+        try {
+          error = JSON.parse(responseText)
+        } catch (e) {
+          error = { error: responseText }
+        }
+        throw new Error(error.error || 'Failed to save item')
       }
+
+      const savedItem = JSON.parse(responseText)
+      console.log('Item saved successfully:', savedItem)
 
       // Remove the saved item from the list
       setDetectedItems(prev => prev.filter(i => i.id !== item.id))
+      setConfirmedItems(prev => prev.filter(i => i.id !== item.id))
+      
+      showToast('Item saved successfully!', 'success')
     } catch (error) {
       console.error('Error saving item:', error)
+      showToast('Failed to save item. Please try again.', 'error')
     }
   }
 
   const handleFeedback = async (isCorrect: boolean, correctName?: string) => {
     if (!feedbackItem) return
-
+    
+    if (!session?.user) {
+      console.error('No user session found')
+      showToast('You must be logged in to provide feedback.', 'error')
+      return
+    }
+  
     try {
-      // First save the feedback
-      const response = await fetch('/api/items/feedback', {
+      // Create the confirmed item
+      const confirmedItem = isCorrect 
+        ? { ...feedbackItem, confidence: 1.0 }
+        : correctName 
+          ? { ...feedbackItem, name: correctName, confidence: 1.0 }
+          : null
+  
+      // Save feedback and training data
+      const feedbackResponse = await fetch('/api/items/feedback', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -218,25 +279,51 @@ export default function ItemScanner() {
           imageData: feedbackItem.imageData,
           detectedName: feedbackItem.name,
           confidence: feedbackItem.confidence,
+          userId: session.user.id,
         }),
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to save feedback')
+  
+      if (!feedbackResponse.ok) {
+        const errorText = await feedbackResponse.text()
+        console.error('Feedback error:', feedbackResponse.status, errorText)
+        throw new Error(`Failed to save feedback: ${feedbackResponse.status}`)
       }
-
-      // Create the confirmed item
-      const confirmedItem = isCorrect 
-        ? { ...feedbackItem, confidence: 1.0 }
-        : correctName 
-          ? { ...feedbackItem, name: correctName, confidence: 1.0 }
-          : null
-
+  
+      // Save training data when user corrects or confirms an item
+      if (isCorrect || correctName) {
+        const trainingResponse = await fetch('/api/training', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            itemName: isCorrect ? feedbackItem.name : correctName,
+            imageData: feedbackItem.imageData,
+            bbox: feedbackItem.bbox,
+            confidence: feedbackItem.confidence,
+            detectedAs: feedbackItem.name,
+            userId: session.user.id,
+          }),
+        })
+  
+        if (!trainingResponse.ok) {
+          const errorText = await trainingResponse.text()
+          console.error('Training error:', trainingResponse.status, errorText)
+          console.error('Failed to save training data')
+        }
+      }
+  
       // Add to confirmed items if valid
       if (confirmedItem) {
         setConfirmedItems(prev => [...prev, confirmedItem])
+        
+        // Automatically save the item to the database
+        if (isCorrect || correctName) {
+          await saveItem(confirmedItem)
+          console.log('Item automatically saved to database')
+        }
       }
-
+  
       // Update the detected items list and show next item for feedback
       setDetectedItems(prev => {
         const remainingItems = prev.filter(i => i.id !== feedbackItem.id)
@@ -248,13 +335,21 @@ export default function ItemScanner() {
         return remainingItems
       })
     } catch (error) {
-      console.error('Error saving feedback:', error)
-      setFeedbackItem(null)
+      console.error('Error handling feedback:', error)
+      showToast('Error saving item. Please try again.', 'error')
     }
   }
 
   return (
     <div className="space-y-4">
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+      
       <div className="flex justify-center space-x-4">
         <button
           onClick={isScanning ? stopCamera : startCamera}
@@ -326,3 +421,7 @@ export default function ItemScanner() {
     </div>
   )
 } 
+
+
+
+

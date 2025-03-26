@@ -15,8 +15,10 @@ const nextConfig = {
   },
   // Increase the timeout for development server
   experimental: {
-    serverActions: true,
+
   },
 }
 
-module.exports = nextConfig 
+ module.exports = {
+     // Add other configurations here
+   };

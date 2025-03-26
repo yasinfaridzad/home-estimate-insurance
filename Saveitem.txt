@@ -1,0 +1,54 @@
+line 179 - 228 
+
+
+
+const saveItem = async (item: DetectedItem) => {
+    if (!session?.user) {
+      console.error('No user session found')
+      alert('You must be logged in to save items.')
+      return
+    }
+
+    try {
+      console.log('Starting to save item:', {
+        name: item.name,
+        confidence: item.confidence,
+        imageDataLength: item.imageData ? item.imageData.length : 0,
+        sessionUser: session.user
+      })
+
+      const response = await fetch('/api/items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: item.name,
+          confidence: item.confidence,
+          imageData: item.imageData,
+        }),
+      })
+
+      const responseText = await response.text()
+      console.log('Raw response:', responseText)
+
+      if (!response.ok) {
+        let error
+        try {
+          error = JSON.parse(responseText)
+        } catch (e) {
+          error = { error: responseText }
+        }
+        throw new Error(error.error || 'Failed to save item')
+      }
+
+      const savedItem = JSON.parse(responseText)
+      console.log('Item saved successfully:', savedItem)
+
+      // Remove the saved item from the list
+      setDetectedItems(prev => prev.filter(i => i.id !== item.id))
+    } catch (error) {
+      console.error('Error saving item:', error)
+      alert('Failed to save item. Please try again.')
+    }
+  }

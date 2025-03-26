@@ -27,25 +27,42 @@ export default function ReportsPage() {
     const fetchItems = async () => {
       if (session?.user) {
         try {
-          console.log('Fetching items for user:', session.user.id);
+          console.log('Starting to fetch items:', {
+            sessionUser: session.user,
+            status
+          });
+          
           const response = await fetch('/api/items')
+          console.log('Fetch response status:', response.status);
+          
+          const responseText = await response.text()
+          console.log('Raw response:', responseText);
+          
           if (response.ok) {
-            const data = await response.json()
-            console.log('Fetched items:', data);
+            const data = JSON.parse(responseText)
+            console.log('Parsed items:', data);
             setItems(data)
           } else {
-            console.error('Failed to fetch items:', response.status);
+            console.error('Failed to fetch items:', {
+              status: response.status,
+              response: responseText
+            });
           }
         } catch (error) {
           console.error('Error fetching items:', error)
         } finally {
           setLoading(false)
         }
+      } else {
+        console.log('No session user available yet');
+        setLoading(false)
       }
     }
 
-    fetchItems()
-  }, [session])
+    if (status !== 'loading') {
+      fetchItems()
+    }
+  }, [session, status])
 
   const handleDelete = async (itemId: string) => {
     if (!confirm('Are you sure you want to delete this item?')) {
