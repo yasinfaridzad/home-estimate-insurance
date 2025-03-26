@@ -1,26 +1,25 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { authOptions } from '../auth/[...nextauth]/route'
 import prisma from '@/lib/prisma'
 
-// Save training data
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
+    const body = await request.json()
+    const { itemName, imageData, bbox, confidence, detectedAs } = body
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    if (!itemName || !imageData || !bbox || !detectedAs) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      )
     }
 
-    const data = await request.json()
-    const { itemName, imageData, bbox, confidence, detectedAs } = data
     const [bboxX, bboxY, bboxWidth, bboxHeight] = bbox
 
     const trainingData = await prisma.trainingData.create({
@@ -33,14 +32,17 @@ export async function POST(request: Request) {
         bboxHeight,
         confidence,
         detectedAs,
-        userId: user.id,
+        userId: session.user.id
       }
     })
 
-    return NextResponse.json({ success: true, data: trainingData })
+    return NextResponse.json(trainingData)
   } catch (error) {
     console.error('Error saving training data:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to save training data' },
+      { status: 500 }
+    )
   }
 }
 

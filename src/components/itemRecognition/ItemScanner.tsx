@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { Button } from '@/components/ui/Button'
+import Toast from '@/components/ui/Toast'
 import * as tf from '@tensorflow/tfjs'
 import * as cocoSsd from '@tensorflow-models/coco-ssd'
-import Toast from '@/components/ui/Toast'
 
 interface DetectedItem {
   id: string
@@ -12,6 +13,11 @@ interface DetectedItem {
   confidence: number
   bbox: [number, number, number, number]
   imageData?: string
+}
+
+interface ToastMessage {
+  message: string
+  type: 'success' | 'error' | 'info'
 }
 
 interface FeedbackModalProps {
@@ -69,28 +75,20 @@ function FeedbackModal({ item, onFeedback, onClose }: FeedbackModalProps) {
   )
 }
 
-interface ToastMessage {
-  message: string
-  type: 'success' | 'error' | 'info'
-}
-
 export default function ItemScanner() {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const { data: session } = useSession()
   const [isScanning, setIsScanning] = useState(false)
   const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([])
-  const [model, setModel] = useState<cocoSsd.ObjectDetection | null>(null)
   const [feedbackItem, setFeedbackItem] = useState<DetectedItem | null>(null)
   const [confirmedItems, setConfirmedItems] = useState<DetectedItem[]>([])
   const [toast, setToast] = useState<ToastMessage | null>(null)
-  const { data: session } = useSession()
-
-  const showToast = (message: string, type: 'success' | 'error' | 'info') => {
-    setToast({ message, type })
-  }
+  const [model, setModel] = useState<cocoSsd.ObjectDetection | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
-    // Load the COCO-SSD model
+    // Load the model when component mounts
     const loadModel = async () => {
       try {
         await tf.ready()
@@ -98,99 +96,228 @@ export default function ItemScanner() {
         setModel(loadedModel)
       } catch (error) {
         console.error('Error loading model:', error)
+        setToast({
+          message: 'Failed to load detection model',
+          type: 'error'
+        })
       }
     }
+
     loadModel()
+
+    // Cleanup function
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+    }
   }, [])
 
-  const startCamera = async () => {
+  const startScanning = async () => {
+    if (!model || !videoRef.current || !canvasRef.current) return
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      // Set up video stream
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
           width: { ideal: 1280 },
           height: { ideal: 720 },
           facingMode: 'environment'
         } 
       })
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-      }
+      
+      streamRef.current = stream
+      const video = videoRef.current
+      video.srcObject = stream
+
+      // Wait for video to be ready
+      await new Promise((resolve) => {
+        video.onloadedmetadata = () => {
+          video.play()
+          resolve(true)
+        }
+      })
+
       setIsScanning(true)
+      const canvas = canvasRef.current
+      const context = canvas.getContext('2d')
+
+      if (!context) {
+        throw new Error('Failed to get canvas context')
+      }
+
+      // Start detection loop
+      const detectLoop = () => {
+        if (!isScanning) return
+
+        // Draw video frame to canvas
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        context.drawImage(video, 0, 0)
+
+        // Run detection
+        model.detect(canvas).then(predictions => {
+          // Process predictions with confidence threshold
+          const items = predictions
+            .filter(pred => pred.score > 0.5) // Only keep high confidence detections
+            .map(pred => ({
+              id: Math.random().toString(36).substr(2, 9),
+              name: pred.class,
+              confidence: pred.score,
+              bbox: pred.bbox as [number, number, number, number],
+              imageData: canvas.toDataURL('image/jpeg', 0.8)
+            }))
+
+          setDetectedItems(items)
+          
+          // Set current item if none is selected
+          if (items.length > 0 && !feedbackItem) {
+            setFeedbackItem(items[0])
+          }
+
+          // Draw bounding boxes
+          context.strokeStyle = '#00ff00'
+          context.lineWidth = 2
+          items.forEach(item => {
+            const [x, y, width, height] = item.bbox
+            context.strokeRect(x, y, width, height)
+            context.fillStyle = '#00ff00'
+            context.font = '16px Arial'
+            context.fillText(`${item.name} (${Math.round(item.confidence * 100)}%)`, x, y - 5)
+          })
+
+          // Continue detection loop
+          requestAnimationFrame(detectLoop)
+        }).catch(error => {
+          console.error('Error in detection loop:', error)
+          setToast({
+            message: 'Error during detection',
+            type: 'error'
+          })
+        })
+      }
+
+      detectLoop()
     } catch (error) {
-      console.error('Error accessing camera:', error)
+      console.error('Error starting camera:', error)
+      setToast({
+        message: 'Failed to start camera',
+        type: 'error'
+      })
     }
   }
 
-  const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream
-      stream.getTracks().forEach(track => track.stop())
+  const stopScanning = () => {
+    setIsScanning(false)
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
       videoRef.current.srcObject = null
     }
-    setIsScanning(false)
   }
 
-  const getImageData = (canvas: HTMLCanvasElement): string => {
-    return canvas.toDataURL('image/jpeg', 0.8)
-  }
-
-  const detectItems = async () => {
-    if (!model || !videoRef.current || !canvasRef.current) return
-
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    const context = canvas.getContext('2d')
-
-    if (!context) return
-
-    // Set canvas dimensions to match video
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-
-    // Draw video frame on canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-    // Get image data for training
-    const imageData = getImageData(canvas)
-
-    // Run detection
-    const predictions = await model.detect(canvas)
-    
-    // Process predictions
-    const items: DetectedItem[] = predictions.map(pred => ({
-      id: Math.random().toString(36).substr(2, 9),
-      name: pred.class,
-      confidence: pred.score,
-      bbox: pred.bbox as [number, number, number, number],
-      imageData
-    }))
-
-    // Clear previous detections
-    setDetectedItems([])
-    setConfirmedItems([])
-
-    // Show feedback modal for each detected item
-    if (items.length > 0) {
-      setDetectedItems(items)
-      setFeedbackItem(items[0])
+  const handleFeedback = async (isCorrect: boolean, correctName?: string) => {
+    if (!feedbackItem || !session?.user) {
+      setToast({
+        message: 'Please log in to provide feedback',
+        type: 'error'
+      })
+      return
     }
 
-    // Draw bounding boxes
-    context.strokeStyle = '#00ff00'
-    context.lineWidth = 2
-    items.forEach(item => {
-      const [x, y, width, height] = item.bbox
-      context.strokeRect(x, y, width, height)
-      context.fillStyle = '#00ff00'
-      context.font = '16px Arial'
-      context.fillText(`${item.name} (${Math.round(item.confidence * 100)}%)`, x, y - 5)
-    })
+    try {
+      // Create the confirmed item
+      const confirmedItem = isCorrect 
+        ? { ...feedbackItem, confidence: 1.0 }
+        : correctName 
+          ? { ...feedbackItem, name: correctName, confidence: 1.0 }
+          : null
+
+      // Save feedback and training data
+      const feedbackResponse = await fetch('/api/items/feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          itemId: feedbackItem.id,
+          isCorrect,
+          correctName,
+          imageData: feedbackItem.imageData,
+          detectedName: feedbackItem.name,
+          confidence: feedbackItem.confidence,
+        }),
+      })
+
+      if (!feedbackResponse.ok) {
+        throw new Error('Failed to save feedback')
+      }
+
+      // Save training data when user corrects or confirms an item
+      if (isCorrect || correctName) {
+        const trainingResponse = await fetch('/api/training', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            itemName: isCorrect ? feedbackItem.name : correctName,
+            imageData: feedbackItem.imageData,
+            bbox: feedbackItem.bbox,
+            confidence: feedbackItem.confidence,
+            detectedAs: feedbackItem.name,
+          }),
+        })
+
+        if (!trainingResponse.ok) {
+          console.error('Failed to save training data')
+        }
+      }
+
+      // Add to confirmed items if valid
+      if (confirmedItem) {
+        setConfirmedItems(prev => [...prev, confirmedItem])
+        
+        // Automatically save the item to the database
+        if (isCorrect || correctName) {
+          await saveItem(confirmedItem)
+          console.log('Item automatically saved to database')
+        }
+      }
+
+      // Update the detected items list and show next item for feedback
+      setDetectedItems(prev => {
+        const remainingItems = prev.filter(i => i.id !== feedbackItem.id)
+        if (remainingItems.length > 0) {
+          setFeedbackItem(remainingItems[0])
+        } else {
+          setFeedbackItem(null)
+        }
+        return remainingItems
+      })
+
+      setToast({
+        message: isCorrect ? 'Item saved successfully' : 'Feedback recorded for improvement',
+        type: 'success'
+      })
+    } catch (error) {
+      console.error('Error saving feedback:', error)
+      setToast({
+        message: 'Failed to save feedback',
+        type: 'error'
+      })
+    }
   }
 
   const saveItem = async (item: DetectedItem) => {
     if (!session?.user) {
       console.error('No user session found')
-      showToast('You must be logged in to save items.', 'error')
+      setToast({
+        message: 'You must be logged in to save items.',
+        type: 'error'
+      })
       return
     }
 
@@ -205,7 +332,10 @@ export default function ItemScanner() {
       // Check if imageData is valid
       if (!item.imageData || item.imageData.length < 100) {
         console.error('Invalid or missing image data')
-        showToast('Missing image data. Please try capturing the item again.', 'error')
+        setToast({
+          message: 'Missing image data. Please try capturing the item again.',
+          type: 'error'
+        })
         return
       }
 
@@ -242,106 +372,29 @@ export default function ItemScanner() {
       setDetectedItems(prev => prev.filter(i => i.id !== item.id))
       setConfirmedItems(prev => prev.filter(i => i.id !== item.id))
       
-      showToast('Item saved successfully!', 'success')
+      setToast({
+        message: 'Item saved successfully!',
+        type: 'success'
+      })
     } catch (error) {
       console.error('Error saving item:', error)
-      showToast('Failed to save item. Please try again.', 'error')
+      setToast({
+        message: 'Failed to save item. Please try again.',
+        type: 'error'
+      })
     }
   }
 
-  const handleFeedback = async (isCorrect: boolean, correctName?: string) => {
-    if (!feedbackItem) return
-    
-    if (!session?.user) {
-      console.error('No user session found')
-      showToast('You must be logged in to provide feedback.', 'error')
-      return
-    }
-  
-    try {
-      // Create the confirmed item
-      const confirmedItem = isCorrect 
-        ? { ...feedbackItem, confidence: 1.0 }
-        : correctName 
-          ? { ...feedbackItem, name: correctName, confidence: 1.0 }
-          : null
-  
-      // Save feedback and training data
-      const feedbackResponse = await fetch('/api/items/feedback', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          itemId: feedbackItem.id,
-          isCorrect,
-          correctName,
-          imageData: feedbackItem.imageData,
-          detectedName: feedbackItem.name,
-          confidence: feedbackItem.confidence,
-          userId: session.user.id,
-        }),
-      })
-  
-      if (!feedbackResponse.ok) {
-        const errorText = await feedbackResponse.text()
-        console.error('Feedback error:', feedbackResponse.status, errorText)
-        throw new Error(`Failed to save feedback: ${feedbackResponse.status}`)
-      }
-  
-      // Save training data when user corrects or confirms an item
-      if (isCorrect || correctName) {
-        const trainingResponse = await fetch('/api/training', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            itemName: isCorrect ? feedbackItem.name : correctName,
-            imageData: feedbackItem.imageData,
-            bbox: feedbackItem.bbox,
-            confidence: feedbackItem.confidence,
-            detectedAs: feedbackItem.name,
-            userId: session.user.id,
-          }),
-        })
-  
-        if (!trainingResponse.ok) {
-          const errorText = await trainingResponse.text()
-          console.error('Training error:', trainingResponse.status, errorText)
-          console.error('Failed to save training data')
-        }
-      }
-  
-      // Add to confirmed items if valid
-      if (confirmedItem) {
-        setConfirmedItems(prev => [...prev, confirmedItem])
-        
-        // Automatically save the item to the database
-        if (isCorrect || correctName) {
-          await saveItem(confirmedItem)
-          console.log('Item automatically saved to database')
-        }
-      }
-  
-      // Update the detected items list and show next item for feedback
-      setDetectedItems(prev => {
-        const remainingItems = prev.filter(i => i.id !== feedbackItem.id)
-        if (remainingItems.length > 0) {
-          setFeedbackItem(remainingItems[0])
-        } else {
-          setFeedbackItem(null)
-        }
-        return remainingItems
-      })
-    } catch (error) {
-      console.error('Error handling feedback:', error)
-      showToast('Error saving item. Please try again.', 'error')
-    }
+  if (!session?.user) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
+        <p className="text-gray-600">Please sign in to use the scanner</p>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {toast && (
         <Toast
           message={toast.message}
@@ -349,75 +402,54 @@ export default function ItemScanner() {
           onClose={() => setToast(null)}
         />
       )}
-      
-      <div className="flex justify-center space-x-4">
-        <button
-          onClick={isScanning ? stopCamera : startCamera}
-          className={`px-4 py-2 rounded-lg ${
-            isScanning
-              ? 'bg-red-600 hover:bg-red-700'
-              : 'bg-blue-600 hover:bg-blue-700'
-          } text-white transition-colors`}
+
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Item Scanner</h2>
+        <Button
+          onClick={isScanning ? stopScanning : startScanning}
+          variant={isScanning ? 'destructive' : 'default'}
         >
           {isScanning ? 'Stop Scanning' : 'Start Scanning'}
-        </button>
-        {isScanning && (
-          <button
-            onClick={detectItems}
-            className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors"
-          >
-            Detect Items
-          </button>
-        )}
+        </Button>
       </div>
 
-      <div className="relative">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          className="w-full max-w-2xl mx-auto rounded-lg shadow-lg"
-        />
-        <canvas
-          ref={canvasRef}
-          className="absolute top-0 left-0 w-full max-w-2xl mx-auto rounded-lg shadow-lg"
-        />
-      </div>
-
-      {confirmedItems.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-xl font-semibold mb-2">Confirmed Items:</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {confirmedItems.map(item => (
-              <div
-                key={item.id}
-                className="bg-white p-4 rounded-lg shadow-md flex justify-between items-center"
-              >
-                <div>
-                  <h4 className="font-medium">{item.name}</h4>
-                  <p className="text-sm text-gray-600">
-                    Confidence: {Math.round(item.confidence * 100)}%
-                  </p>
-                </div>
-                <button
-                  onClick={() => saveItem(item)}
-                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                >
-                  Save
-                </button>
-              </div>
-            ))}
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover"
+          />
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0"
+          />
         </div>
-      )}
 
-      {feedbackItem && (
-        <FeedbackModal
-          item={feedbackItem}
-          onFeedback={handleFeedback}
-          onClose={() => setFeedbackItem(null)}
-        />
-      )}
+        <div className="space-y-4">
+          {confirmedItems.length > 0 && (
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <h3 className="text-xl font-semibold mb-4">Confirmed Items:</h3>
+              <div className="space-y-2">
+                {confirmedItems.map(item => (
+                  <p key={item.id}>
+                    <span className="font-medium">Name:</span> {item.name}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {feedbackItem && (
+            <FeedbackModal
+              item={feedbackItem}
+              onFeedback={handleFeedback}
+              onClose={() => setFeedbackItem(null)}
+            />
+          )}
+        </div>
+      </div>
     </div>
   )
 } 
