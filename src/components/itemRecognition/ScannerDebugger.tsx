@@ -1,5 +1,5 @@
 'use client'
-
+import * as tf from '@tensorflow/tfjs-node'
 import { useState, useRef, useEffect } from 'react'
 import * as tf from '@tensorflow/tfjs'
 
@@ -140,7 +140,7 @@ export default function ScannerDebugger() {
 
         // Convert to tensor
         setDebugInfo(prev => ({ ...prev, tensorStatus: 'Converting...' }))
-        const tensor = tf.browser.fromPixels(canvas)
+        const tensor = tf.node.decodeImage(buffer)
         const resized = tf.image.resizeBilinear(tensor, [224, 224])
         const expanded = resized.expandDims(0)
         const normalized = expanded.toFloat().div(255.0)

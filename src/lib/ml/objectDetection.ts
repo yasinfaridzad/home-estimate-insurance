@@ -1,3 +1,4 @@
+// detectObjects – serverkompatibel mit tf.node.decodeImage
 import * as tf from '@tensorflow/tfjs-node'
 import * as cocoSsd from '@tensorflow-models/coco-ssd'
 import { createCanvas, loadImage } from 'canvas'
@@ -25,27 +26,20 @@ export async function detectObjects(imageData: string, userId?: string): Promise
       await initializeModel()
     }
 
-    // Remove data URL prefix if present
+    // Convert base64 image data to buffer
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '')
     const buffer = Buffer.from(base64Data, 'base64')
-    
-    // Load image
-    const image = await loadImage(buffer)
-    const canvas = createCanvas(image.width, image.height)
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(image, 0, 0)
+
+    // Decode image using tfjs-node (server-side compatible)
+    const tensor = tf.node.decodeImage(buffer)
 
     // Get predictions from COCO-SSD model
-    const tensor = tf.browser.fromPixels(canvas)
-    const predictions = await model!.detect(tensor)
-    
-    // Get prediction from our custom model
+    const predictions = await model!.detect(tensor as any)
+
     const customPrediction = userId ? await predictWithCustomModel(imageData) : null
 
-    // Clean up
     tensor.dispose()
 
-    // Combine predictions
     const detectedObjects = predictions.map(pred => ({
       name: pred.class,
       category: getCategoryFromClass(pred.class),
@@ -53,18 +47,15 @@ export async function detectObjects(imageData: string, userId?: string): Promise
       bbox: pred.bbox as [number, number, number, number]
     }))
 
-    // If we have a custom prediction with high confidence, use it to refine the category
     if (customPrediction && customPrediction.confidence > 0.5) {
       detectedObjects.forEach(obj => {
         obj.category = customPrediction.category
-        // Boost confidence if custom model agrees
         if (obj.category === customPrediction.category) {
           obj.confidence = (obj.confidence + customPrediction.confidence) / 2
         }
       })
     }
 
-    // If we have a userId, trigger async model training
     if (userId) {
       trainModelOnUserData(userId).catch(console.error)
     }
@@ -80,8 +71,7 @@ function getCategoryFromClass(className: string): string {
   const categories = {
     furniture: ['chair', 'couch', 'bed', 'dining table', 'bench'],
     electronics: ['tv', 'laptop', 'cell phone', 'keyboard', 'mouse'],
-    appliances: ['refrigerator', 'microwave', 'oven', 'toaster'],
-    // Add more categories as needed
+    appliances: ['refrigerator', 'microwave', 'oven', 'toaster']
   }
 
   for (const [category, items] of Object.entries(categories)) {
@@ -91,4 +81,4 @@ function getCategoryFromClass(className: string): string {
   }
 
   return 'other'
-} 
+}

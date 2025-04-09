@@ -60,7 +60,7 @@ async function prepareTrainingData(items: Item[]): Promise<TrainingData[]> {
       const ctx = canvas.getContext('2d')
       ctx.drawImage(image, 0, 0, 224, 224)
       
-      const tensor = tf.browser.fromPixels(canvas)
+      const tensor = tf.node.decodeImage(buffer)
       const normalized = tensor.toFloat().div(255.0)
 
       trainingData.push({
@@ -176,7 +176,7 @@ export async function predictWithCustomModel(imageData: string): Promise<{ categ
     ctx.drawImage(image, 0, 0, 224, 224)
     
     // Convert to tensor and normalize
-    const tensor = tf.browser.fromPixels(canvas)
+    const tensor = tf.node.decodeImage(buffer)
     const normalized = tensor.toFloat().div(255.0)
     const batched = normalized.expandDims(0)
 

@@ -3,7 +3,6 @@ import { detectObjects } from '@/lib/ai/detector' // Pfad anpassen, je nachdem, 
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../auth/[...nextauth]' // Passe das an deinen Auth-Pfad an
 
-console.log('Vorhersage Ergebnis:', detectObjects);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -21,6 +20,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const userId = session?.user?.id
 
     const detected = await detectObjects(imageData, userId ?? undefined)
+    console.log('DETECTED OBJECTS:', detected)
+
 
     if (!detected || detected.length === 0) {
       return res.status(200).json({ message: 'No objects detected' })
