@@ -32,8 +32,9 @@ export async function POST(request: Request) {
         bboxHeight,
         confidence,
         detectedAs,
-        userId: session.user.id
-      }
+        userId: session.user.id,
+        isVerified: true
+      },
     })
 
     return NextResponse.json(trainingData)

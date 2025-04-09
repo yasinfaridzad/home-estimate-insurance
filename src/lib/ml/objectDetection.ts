@@ -54,7 +54,7 @@ export async function detectObjects(imageData: string, userId?: string): Promise
     }))
 
     // If we have a custom prediction with high confidence, use it to refine the category
-    if (customPrediction && customPrediction.confidence > 0.8) {
+    if (customPrediction && customPrediction.confidence > 0.5) {
       detectedObjects.forEach(obj => {
         obj.category = customPrediction.category
         // Boost confidence if custom model agrees
