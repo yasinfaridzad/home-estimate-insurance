@@ -1,51 +1,75 @@
-# HomeScan Insurance Estimator
 
-A Next.js application that uses computer vision to scan household items and estimate their insurance value.
+# 🏠 Home Estimate Insurance
 
-## Features
+**Schätzung des Versicherungswerts von Wohnungseinrichtung mittels Computer Vision**
 
-- Item recognition using TensorFlow.js
-- Real-time camera scanning
-- Insurance value estimation
-- PDF report generation
-- User authentication with Google
-- Responsive design with Tailwind CSS
+Dieses Projekt ist ein Proof of Concept für eine KI-gestützte Anwendung, die Bilder aus Wohnungen analysiert und den Gesamtwert der erkannten Einrichtungsgegenstände automatisch schätzt. Ziel ist es, eine einfache, digitale Lösung zur Bewertung von Wohnungseinrichtung z. B. für Versicherungszwecke bereitzustellen.
 
-## Setup
+---
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yasinfaridzad/home-estimate-insurance.git
-cd home-estimate-insurance
+## 🔍 Projektidee
+
+Viele Menschen wissen nicht genau, wie viel ihre Einrichtung wert ist – besonders im Schadensfall ist eine schnelle Einschätzung wichtig. Dieses System nutzt Computer Vision, um typische Gegenstände wie Fernseher, Sofa, Laptop etc. in einem Bild zu erkennen und diesen auf Basis einer Preisdatenbank Werte zuzuordnen.
+
+Am Ende erhält man eine geschätzte Gesamtsumme – etwa für Versicherungsanträge, digitale Schadensmeldungen oder Wohnungsinventuren.
+
+---
+
+## ⚙️ Verwendete Technologien
+
+- **Python** – Hauptprogrammiersprache
+- **YOLOv5** – Object Detection Modell zur Objekterkennung im Bild
+- **OpenCV** – Bildverarbeitung
+- **Streamlit** *(in Entwicklung)* – Benutzeroberfläche zur Interaktion
+- **Preisdatenbank** – Interne Logik zur Zuordnung realistischer Preise zu Objekttypen
+- **COCO-Datensatz** – Für vorkonfigurierte Objekterkennungsklassen (z. B. `tv`, `couch`, `chair`, `laptop`)
+
+---
+
+## 🧠 Funktionsweise
+
+1. Benutzer lädt ein Foto einer Wohnung hoch (z. B. per Smartphone)
+2. YOLOv5 erkennt darin relevante Objekte
+3. Jedes erkannte Objekt wird einer Kategorie und einem geschätzten Preis zugeordnet
+4. Das System berechnet die Gesamtsumme und zeigt alle Einzelwerte an
+
+---
+
+## 📊 Beispielausgabe
+
+```text
+Erkannte Objekte:
+- Sofa: 850 €
+- Fernseher: 1.200 €
+- Laptop: 1.000 €
+- Couchtisch: 300 €
+
+👉 Geschätzter Gesamtwert: 3.350 €
 ```
 
-2. Install dependencies:
-```bash
-npm install
-```
+---
 
-3. Create a `.env` file with the following variables:
-```
-DATABASE_URL="file:./dev.db"
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="your-secret-key"
-GOOGLE_CLIENT_ID="your-google-client-id"
-GOOGLE_CLIENT_SECRET="your-google-client-secret"
-```
+## 🚀 Anwendungsmöglichkeiten
 
-4. Run the development server:
-```bash
-npm run dev
-```
+- Digitale Wohnungsbewertung
+- Schadensmeldung bei Versicherungen
+- Schnelle Inventarübersicht beim Umzug
+- Unterstützung bei Versicherungsabschlüssen
 
-5. Open [http://localhost:3010](http://localhost:3010) in your browser.
+---
 
-## Technologies Used
+## 📌 Nächste Schritte
 
-- Next.js 14
-- TypeScript
-- TensorFlow.js
-- NextAuth.js
-- Tailwind CSS
-- Prisma
-- PDFKit 
+- Integration von **Streamlit** zur Benutzeroberfläche (Bild-Upload + Anzeige)
+- Ausbau der Preisdatenbank
+- Option zur Anpassung von Objektwerten durch den Nutzer
+- Speicherung der Auswertung als PDF oder Bericht
+
+---
+
+## 👨‍💻 Autor
+
+**Mohammad Yasin Faridzad**  
+[GitHub-Profil](https://github.com/yasinfaridzad)  
+Hamburg, Deutschland  
+Data Science & KI-Enthusiast
