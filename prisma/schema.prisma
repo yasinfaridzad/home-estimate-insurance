@@ -63,6 +63,7 @@ model Item {
   confidence  Float
   imageData   String?
   createdAt   DateTime @default(now())
+  correctedName String?   // <--- HIER!
   userId      String
   user        User     @relation(fields: [userId], references: [id])
   feedback    Feedback?
