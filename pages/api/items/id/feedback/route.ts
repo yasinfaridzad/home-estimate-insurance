@@ -3,21 +3,19 @@ import prisma from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const secret = process.env.NEXTAUTH_SECRET // 🛠️ wichtig!
-  const token = await getToken({ req, secret })
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
 
-  console.log('🧪 FEEDBACK DEBUG | token:', token)
+  console.log('🧪 TOKEN:', token)
 
   if (!token) {
-    console.warn('❌ No token found – 401')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { correctedName } = await req.json()
   const { id } = params
 
-  if (!id || !correctedName || typeof correctedName !== 'string') {
-    return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  if (!id || !correctedName) {
+    return NextResponse.json({ error: 'Missing ID or correctedName' }, { status: 400 })
   }
 
   try {
@@ -26,10 +24,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       data: { correctedName }
     })
 
-    console.log('✅ Correction saved:', updated.id)
+    console.log('✅ correctedName gespeichert:', updated.correctedName)
     return NextResponse.json(updated)
   } catch (error) {
-    console.error('🔥 Error saving correction:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    console.error('🔥 Fehler beim Speichern:', error)
+    return NextResponse.json({ error: 'Serverfehler' }, { status: 500 })
   }
 }
