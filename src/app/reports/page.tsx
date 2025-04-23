@@ -1,206 +1,132 @@
+// Neue Reports-Seite mit Bildern, Suche, Sortierung und Export
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { saveAs } from 'file-saver'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 
 interface Item {
   id: string
   name: string
   correctedName?: string
   confidence: number
+  estimatedValue: number
   imageData?: string
-  createdAt: string
+  createdAt: string // ✅ neu!
 }
 
 export default function ReportsPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
+  const { data: session } = useSession()
   const [items, setItems] = useState<Item[]>([])
-  const [loading, setLoading] = useState(true)
+  const [filtered, setFiltered] = useState<Item[]>([])
+  const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<'date' | 'price' | 'name'>('date')
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin')
-    }
-  }, [status, router])
-
-  useEffect(() => {
-    const fetchItems = async () => {
-      if (session?.user) {
-        try {
-          const response = await fetch('/api/items')
-          const responseText = await response.text()
-          if (response.ok) {
-            const data = JSON.parse(responseText)
-            setItems(data)
-          } else {
-            console.error('Failed to fetch items:', response.status)
-          }
-        } catch (error) {
-          console.error('Error fetching items:', error)
-        } finally {
-          setLoading(false)
-        }
-      } else {
-        setLoading(false)
-      }
-    }
-    if (status !== 'loading') {
-      fetchItems()
-    }
-  }, [session, status])
-
-  const handleDelete = async (itemId: string) => {
-    if (!confirm('Are you sure you want to delete this item?')) return
-    try {
-      const res = await fetch(`/api/items/${itemId}`, { method: 'DELETE' })
-      if (res.ok) setItems(prev => prev.filter(item => item.id !== itemId))
-    } catch (err) {
-      console.error('Delete failed', err)
-    }
-  }
-
-  const handleCorrection = async (itemId: string, correctedName: string) => {
-    try {
-      const res = await fetch(`/api/items/${itemId}/feedback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ correctedName })
+    fetch('/api/items')
+      .then(res => res.json())
+      .then(data => {
+        setItems(data)
+        setFiltered(data)
       })
-      if (res.ok) {
-        setItems(prev =>
-          prev.map(item =>
-            item.id === itemId ? { ...item, correctedName } : item
-          )
-        )
-      } else {
-        console.error('Feedback speichern fehlgeschlagen')
-      }
-    } catch (err) {
-      console.error('Correction failed', err)
+  }, [])
+
+  useEffect(() => {
+    let data = [...items]
+  
+    // 🔍 Suche
+    if (search) {
+      data = data.filter(i =>
+        i.name?.toLowerCase().includes(search.toLowerCase()) ||
+        i.correctedName?.toLowerCase().includes(search.toLowerCase())
+      )
     }
+  
+    // 🔢 Sortierung
+    if (sortBy === 'price') {
+      data.sort((a, b) => (b.estimatedValue ?? 0) - (a.estimatedValue ?? 0))
+    } else if (sortBy === 'name') {
+      data.sort((a, b) =>
+        (a.correctedName || a.name).localeCompare(b.correctedName || b.name)
+      )
+    } else {
+      data.sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
+    }
+  
+    setFiltered(data)
+  }, [search, sortBy, items])
+
+  const handleDelete = async (id: string) => {
+    await fetch(`/api/items/${id}`, { method: 'DELETE' })
+    setItems(prev => prev.filter(item => item.id !== id))
   }
 
   const handleExportCSV = () => {
-    const header = 'Name,Korrigierter Name,Confidence (%),Wert (€),Datum\n'
-    const rows = items.map(i => `"${i.name}","${i.correctedName || ''}",${Math.round(i.confidence * 100)},${getItemValue(i)},${new Date(i.createdAt).toLocaleDateString()}`).join('\n')
-    const blob = new Blob([header + rows], { type: 'text/csv' })
-    saveAs(blob, 'scan-report.csv')
+    const header = 'Name,Korrigierter Name,Confidence (%),Preis (€),Datum\n'
+    const rows = filtered.map(i =>
+      `${i.name},"${i.correctedName ?? ''}",${Math.round(i.confidence * 100)},${i.estimatedValue ?? ''},${new Date(i.createdAt).toLocaleDateString()}`
+    )
+    const blob = new Blob([header + rows.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    saveAs(blob, 'report.csv')
   }
-
-  const handleExportPDF = () => {
-    const doc = new jsPDF()
-    doc.text('Scan Report', 14, 16)
-
-    const tableData = items.map((i, idx) => [
-      idx + 1,
-      i.name,
-      i.correctedName || '-',
-      `${Math.round(i.confidence * 100)}%`,
-      `€${getItemValue(i)}`,
-      new Date(i.createdAt).toLocaleDateString()
-    ])
-
-    autoTable(doc, {
-      head: [['#', 'Name', 'Korrigiert', 'Confidence', 'Wert', 'Datum']],
-      body: tableData,
-      startY: 20
-    })
-
-    doc.save('scan-report.pdf')
-  }
-
-  const getItemValue = (item: Item): number => {
-    const baseValues: Record<string, number> = {
-      chair: 200, sofa: 800, tv: 600, laptop: 1000, refrigerator: 1200
+  
+  const handleExportPDF = async () => {
+    const response = await fetch('/api/reports/pdf')
+    if (!response.ok) {
+      alert('Fehler beim PDF-Export')
+      return
     }
-    const key = (item.correctedName || item.name).toLowerCase()
-    const base = baseValues[key] || 100
-    return Math.round(base * item.confidence)
+  
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'report.pdf'
+    a.click()
+    window.URL.revokeObjectURL(url)
   }
-
-  if (status === 'loading' || loading) return <div>Loading...</div>
-  if (!session?.user) return null
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Scan Reports</h2>
-        <div className="flex gap-4">
-          <button
-            onClick={handleExportCSV}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            Export als CSV
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            Export als PDF
-          </button>
+        <h2 className="text-2xl font-bold">Reports Übersicht</h2>
+        <div className="flex gap-2">
+          <Button onClick={handleExportCSV}>Export CSV</Button>
+          <a href="/api/reports/pdf" target="_blank" rel="noopener noreferrer">
+            <Button>Export PDF</Button>
+           </a>
         </div>
+
       </div>
 
-      <div className="bg-white shadow rounded p-4">
-        <h3 className="font-semibold text-lg mb-4">Items</h3>
-        <ul className="divide-y">
-          {items.map(item => (
-            <li key={item.id} className="py-4 flex gap-4 items-start justify-between">
-              {item.imageData && (
-                <img
-                  src={item.imageData}
-                  alt={item.name}
-                  className="w-20 h-20 object-contain border rounded"
-                />
-              )}
-              <div className="flex-1">
-                <p className="font-medium">
-                  {item.correctedName ? (
-                    <>
-                      <span className="line-through text-red-500">{item.name}</span>{' '}
-                      <span className="text-green-700">{item.correctedName}</span>
-                    </>
-                  ) : (
-                    item.name
-                  )}
-                </p>
-                <p className="text-sm text-gray-500">Confidence: {Math.round(item.confidence * 100)}%</p>
-                <p className="text-sm text-gray-500">Wert: €{getItemValue(item)}</p>
-              </div>
-              <div className="flex flex-col gap-2 items-end">
-                {!item.correctedName && (
-                  <form onSubmit={e => {
-                    e.preventDefault()
-                    const target = e.target as HTMLFormElement
-                    const input = target.elements.namedItem('correction') as HTMLInputElement
-                    handleCorrection(item.id, input.value)
-                    input.value = ''
-                  }}>
-                    <Input
-                      type="text"
-                      name="correction"
-                      placeholder="Korrektur"
-                      className="w-32"
-                    />
-                    <button type="submit" className="mt-1 text-sm text-blue-600 hover:underline">Speichern</button>
-                  </form>
-                )}
-                <button
-                  onClick={() => handleDelete(item.id)}
-                  className="text-sm text-red-600 hover:underline"
-                >
-                  Löschen
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+      <div className="flex items-center gap-4">
+        <Input
+          placeholder="Suche nach Objektname..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="border p-2 rounded">
+          <option value="date">Sortieren nach: Datum</option>
+          <option value="price">Preis</option>
+          <option value="name">Name</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.map(item => (
+          <div key={item.id} className="bg-white p-4 rounded shadow space-y-2">
+            {item.imageData && <img src={item.imageData} alt={item.name} className="w-full h-40 object-contain rounded" />}
+            <h3 className="font-bold text-lg">{item.correctedName || item.name}</h3>
+            <p>Confidence: {Math.round(item.confidence * 100)}%</p>
+            <p>Preis: €{item.estimatedValue}</p>
+            <p className="text-sm text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</p>
+            <Button variant="destructive" onClick={() => handleDelete(item.id)}>Löschen</Button>
+          </div>
+        ))}
       </div>
     </div>
   )

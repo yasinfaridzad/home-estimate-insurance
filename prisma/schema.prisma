@@ -64,9 +64,11 @@ model Item {
   imageData   String?
   createdAt   DateTime @default(now())
   correctedName String?   // <--- HIER!
+  estimatedValue Float?
   userId      String
   user        User     @relation(fields: [userId], references: [id])
   feedback    Feedback?
+  
 }
 
 model Feedback {

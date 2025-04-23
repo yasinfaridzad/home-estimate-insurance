@@ -3,6 +3,7 @@ import { detectObjects } from '@/lib/ai/detector' // Pfad anpassen, je nachdem, 
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../auth/[...nextauth]' // Passe das an deinen Auth-Pfad an
 
+const imageData = fs.readFileSync('test-image.jpg', { encoding: 'base64' })
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
